@@ -110,7 +110,7 @@ struct ec_board_info {
 
 static const struct ec_board_info board_info[] = {
 	{
-		.board_names = {"ONE XPLAYER"},
+		.board_names = {"ONE XPLAYER", "ONEXPLAYER mini A07"},
 		.family = family_mini_amd,
 		.sensors = amd_sensors,
 	},
@@ -223,7 +223,8 @@ static const struct ec_board_info * __init get_board_info(void)
 	const struct ec_board_info *board;
 
 	if (!dmi_board_vendor || !dmi_board_name ||
-	    strcasecmp(dmi_board_vendor, "ONE XPLAYER"))
+	    strcasecmp(dmi_board_vendor, "ONE XPLAYER") ||
+			strcasecmp(dmi_board_vendor, "ONE-NETBOOK"))
 		return NULL;
 
 	/* Match our known boards */
