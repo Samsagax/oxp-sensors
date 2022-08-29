@@ -113,6 +113,11 @@ static const struct ec_board_info board_info[] = {
 	{}
 };
 
+struct oxp_status {
+	struct ec_board_info board;
+	struct lock_data lock_data;
+};
+
 /* Helper functions */
 static int read_from_ec(u8 reg, int size, long *val)
 {
@@ -166,7 +171,8 @@ static int oxp_ec_read(struct device *dev, enum hwmon_sensor_types type,
 		u32 attr, int channel, long *val)
 {
 	int ret = -1;
-	const struct ec_board_info *board = dev_get_drvdata(dev);
+	const struct oxp_status *state = dev_get_drvdata(dev);
+	const struct ec_board_info *board = &state->board;
 
 	switch(type) {
 		case hwmon_fan:
@@ -211,10 +217,16 @@ static int oxp_ec_read(struct device *dev, enum hwmon_sensor_types type,
 	}
 }
 
-static int oxp_pwm_enable(const struct ec_board_info *board)
+static int oxp_pwm_enable(const struct device *dev)
 {
 	int ret = -1;
+	struct oxp_status *state = dev_get_drvdata(dev);
+	const struct ec_board_info *board = &state->board;
 
+	if (!state->lock_data.lock(&state->lock_data)) {
+		dev_warn(dev, "Failed to acquire mutex");
+		return -EBUSY;
+	}
 	switch(board->family) {
 		case family_mini_intel:
 			ret = ec_write(OXP_PWM_INTEL_ENABLE_REG, OXP_PWM_INTEL_ENABLE_VAL);
@@ -225,12 +237,22 @@ static int oxp_pwm_enable(const struct ec_board_info *board)
 		default:
 			pr_debug("Unknown board family");
 	}
+	if (!state->lock_data.unlock(&state->lock_data))
+		dev_err(dev, "Failed to release mutex");
+
 	return ret;
 }
 
-static int oxp_pwm_disable(const struct ec_board_info *board)
+static int oxp_pwm_disable(const struct device *dev)
 {
-	int ret;
+	int ret = -1;
+	struct oxp_status *state = dev_get_drvdata(dev);
+	const struct ec_board_info *board = &state->board;
+
+	if (!state->lock_data.lock(&state->lock_data)) {
+		dev_warn(dev, "Failed to acquire mutex");
+		return -EBUSY;
+	}
 
 	switch(board->family) {
 		case family_mini_intel:
@@ -242,6 +264,10 @@ static int oxp_pwm_disable(const struct ec_board_info *board)
 		default:
 			pr_debug("Unknown board family");
 	}
+
+	if (!state->lock_data.unlock(&state->lock_data))
+		dev_err(dev, "Failed to release mutex");
+
 	return ret;
 }
 
@@ -249,7 +275,8 @@ static int oxp_ec_write(struct device *dev, enum hwmon_sensor_types type,
 		u32 attr, int channel, long val)
 {
 	int ret = -1;
-	const struct ec_board_info *board = dev_get_drvdata(dev);
+	struct oxp_status *state = dev_get_drvdata(dev);
+	const struct ec_board_info *board = &state->board;
 	const struct oxp_ec_sensor_addr *sensor;
 
 	switch(type) {
@@ -257,15 +284,23 @@ static int oxp_ec_write(struct device *dev, enum hwmon_sensor_types type,
 			switch(attr) {
 				case hwmon_pwm_enable:
 					if (val == 1) {
-						ret = oxp_pwm_enable(board);
+						ret = oxp_pwm_enable(dev);
 					} else if (val == 0) {
-						ret = oxp_pwm_disable(board);
+						ret = oxp_pwm_disable(dev);
 					}
 					return ret;
 				case hwmon_pwm_input:
-					for (sensor = board->sensors; board->sensors->type; sensor++) {
+					for (sensor = board->sensors; sensor->type; sensor++) {
 						if (sensor->type == type) {
+							if (!state->lock_data.lock(&state->lock_data)) {
+								dev_warn(dev, "Failed to acquire mutex");
+								return -EBUSY;
+							}
+
 							ret = ec_write(sensor->reg, val);
+
+							if (!state->lock_data.unlock(&state->lock_data))
+								dev_err(dev, "Failed to release mutex");
 						}
 					}
 					return ret;
@@ -297,11 +332,6 @@ static const struct hwmon_ops oxp_ec_hwmon_ops = {
 static const struct hwmon_chip_info oxp_ec_chip_info = {
 	.ops = &oxp_ec_hwmon_ops,
 	.info = oxp_platform_sensors,
-};
-
-struct oxp_status {
-	struct ec_board_info board;
-	struct lock_data lock_data;
 };
 
 /* Initialization logic */
