@@ -354,7 +354,8 @@ static const struct ec_board_info * __init get_board_info(void)
 				 dmi_board_name) >= 0) {
 			if (board->family == family_mini_intel &&
 					boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) {
-				return board;
+				dev_error("Intel boards are not yet supported");
+				return NULL;
 			} else if (board->family == family_mini_amd &&
 					boot_cpu_data.x86_vendor == X86_VENDOR_AMD) {
 				return board;
