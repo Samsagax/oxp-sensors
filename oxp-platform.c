@@ -93,15 +93,6 @@ static const struct oxp_ec_sensor_addr intel_sensors[] = {
 };
 
 
-/* Known sensors in the OXP EC controllers */
-static const struct hwmon_channel_info *oxp_platform_sensors[] = {
-	HWMON_CHANNEL_INFO(fan,
-		HWMON_F_INPUT | HWMON_F_MAX | HWMON_F_MIN | HWMON_F_LABEL),
-	HWMON_CHANNEL_INFO(pwm,
-		HWMON_PWM_INPUT | HWMON_PWM_ENABLE),
-	NULL
-};
-
 struct ec_board_info {
 	const char *board_names[MAX_IDENTICAL_BOARD_VARIATIONS];
 	enum board_family family;
@@ -199,19 +190,28 @@ static int oxp_ec_write(struct device *dev, enum hwmon_sensor_types type,
 	return -1;
 }
 
+/* Known sensors in the OXP EC controllers */
+static const struct hwmon_channel_info *oxp_platform_sensors[] = {
+	HWMON_CHANNEL_INFO(fan,
+		HWMON_F_INPUT | HWMON_F_MAX | HWMON_F_MIN),
+	HWMON_CHANNEL_INFO(pwm,
+		HWMON_PWM_INPUT),
+	NULL
+};
+
 static const struct hwmon_ops oxp_ec_hwmon_ops = {
 	.is_visible = oxp_ec_hwmon_is_visible,
 	.read = oxp_ec_read,
 	.write = oxp_ec_write,
 };
 
-const struct hwmon_chip_info oxp_ec_chip_info = {
+static const struct hwmon_chip_info oxp_ec_chip_info = {
 	.ops = &oxp_ec_hwmon_ops,
 	.info = oxp_platform_sensors,
 };
 
 struct oxp_status {
-	const struct ec_board_info *board;
+	struct ec_board_info board;
 	struct lock_data lock_data;
 };
 
@@ -223,8 +223,8 @@ static const struct ec_board_info * __init get_board_info(void)
 	const struct ec_board_info *board;
 
 	if (!dmi_board_vendor || !dmi_board_name ||
-	    strcasecmp(dmi_board_vendor, "ONE-NETBOOK TECHNOLOGY CO., LTD.") ||
-			strcasecmp(dmi_board_vendor, "ONE-NETBOOK"))
+	    (strcasecmp(dmi_board_vendor, "ONE-NETBOOK TECHNOLOGY CO., LTD.") &&
+	     strcasecmp(dmi_board_vendor, "ONE-NETBOOK")))
 		return NULL;
 
 	/* Match our known boards */
@@ -242,7 +242,6 @@ static const struct ec_board_info * __init get_board_info(void)
 			}
 		}
 	}
-
 	return NULL;
 }
 
@@ -261,8 +260,9 @@ static int __init oxp_platform_probe(struct platform_device *pdev)
 	if (!state)
 		return -ENOMEM;
 
-	dev_set_drvdata(dev, state);
-	state->board = pboard_info;
+	state->board = *pboard_info;
+
+	printk(KERN_DEBUG "Found board %s\n", state->board.board_names[0]);
 
 	state->lock_data.mutex = 0;
 	state->lock_data.lock = lock_global_acpi_lock;
