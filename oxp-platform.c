@@ -167,9 +167,11 @@ static int oxp_ec_read(struct device *dev, enum hwmon_sensor_types type,
 				case hwmon_fan_input:
 					ret = oxp_ec_read_sensor(board->sensors, type, val);
 					break;
-				case hwmon_fan_label:
-				case hwmon_fan_min:
 				case hwmon_fan_max:
+					ret = 0;
+					*val = 5000;
+					break;
+				case hwmon_fan_min:
 					ret = 0;
 					*val = 0;
 					break;
