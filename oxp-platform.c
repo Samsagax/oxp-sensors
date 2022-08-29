@@ -114,27 +114,34 @@ static const struct ec_board_info board_info[] = {
 };
 
 /* Helper functions */
+static int read_from_ec(u8 reg, int size, long *val)
+{
+	int i;
+	int ret;
+	u8 buffer;
+
+	*val = 0;
+	for (i = 0; i < size; i++) {
+		ret = ec_read(reg + i, &buffer);
+		if (ret)
+			return ret;
+		(*val) <<= i*8;
+		*val += buffer;
+	}
+	return ret;
+}
+
 static int oxp_ec_read_sensor(const struct oxp_ec_sensor_addr *sensors,
 				enum hwmon_sensor_types type,
-				long *val) {
+				long *val)
+{
 	int ret = -1;
-	int i = 0;
-	u8 buffer = 0x00;
-	u8 reg = 0x00;
 
 	/* Search the sensor and read it */
 	const struct oxp_ec_sensor_addr *sensor;
 	for (sensor = sensors; sensor->type; sensor++) {
 		if (sensor->type == type) {
-			reg = sensor->reg;
-			*val = 0;
-			for (i = 0; i < sensor->size; i++) {
-				ret = ec_read(reg + i, &buffer);
-				if (ret)
-					return ret;
-				(*val) <<= i*8;
-				*val += buffer;
-			}
+			ret = read_from_ec(sensor->reg, sensor->size, val);
 		}
 	}
 	return ret;
