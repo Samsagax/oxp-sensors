@@ -196,6 +196,9 @@ static int oxp_ec_read(struct device *dev, enum hwmon_sensor_types type,
 			switch(attr) {
 				case hwmon_pwm_input:
 					ret = oxp_ec_read_sensor(board->sensors, type, val);
+					if (board->family == family_mini_amd) {
+						*val = (*val * 255) / 100;
+					}
 					break;
 				case hwmon_pwm_enable:
 					if (board->family == family_mini_intel) {
