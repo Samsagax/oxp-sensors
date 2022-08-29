@@ -187,6 +187,23 @@ static int oxp_ec_read(struct device *dev, enum hwmon_sensor_types type,
 			}
 			return ret;
 		case hwmon_pwm:
+			switch(attr) {
+				case hwmon_pwm_input:
+					ret = oxp_ec_read_sensor(board->sensors, type, val);
+					break;
+				case hwmon_pwm_enable:
+					if (board->family == family_mini_intel) {
+						ret = read_from_ec(OXP_PWM_INTEL_ENABLE_REG, 1, val);
+					} else if (board->family == family_mini_amd) {
+						ret = read_from_ec(OXP_PWM_INTEL_ENABLE_REG, 1, val);
+					} else {
+						ret = -1;
+						pr_debug("Unknown board family, can't read enable PWM");
+					}
+					break;
+				default:
+					pr_debug("Unknown attribute for type %d: %d\n", type, attr);
+			}
 			return ret;
 		default:
 			pr_debug("Unknown sensor type %d.\n", type);
@@ -194,10 +211,72 @@ static int oxp_ec_read(struct device *dev, enum hwmon_sensor_types type,
 	}
 }
 
+static int oxp_pwm_enable(const struct ec_board_info *board)
+{
+	int ret = -1;
+
+	switch(board->family) {
+		case family_mini_intel:
+			ret = ec_write(OXP_PWM_INTEL_ENABLE_REG, OXP_PWM_INTEL_ENABLE_VAL);
+			break;
+		case family_mini_amd:
+			ret = ec_write(OXP_PWM_AMD_ENABLE_REG, OXP_PWM_AMD_ENABLE_VAL);
+			break;
+		default:
+			pr_debug("Unknown board family");
+	}
+	return ret;
+}
+
+static int oxp_pwm_disable(const struct ec_board_info *board)
+{
+	int ret;
+
+	switch(board->family) {
+		case family_mini_intel:
+			ret = ec_write(OXP_PWM_INTEL_ENABLE_REG, OXP_PWM_INTEL_DISABLE_VAL);
+			break;
+		case family_mini_amd:
+			ret = ec_write(OXP_PWM_AMD_ENABLE_REG, OXP_PWM_AMD_DISABLE_VAL);
+			break;
+		default:
+			pr_debug("Unknown board family");
+	}
+	return ret;
+}
+
 static int oxp_ec_write(struct device *dev, enum hwmon_sensor_types type,
 		u32 attr, int channel, long val)
 {
-	return -1;
+	int ret = -1;
+	const struct ec_board_info *board = dev_get_drvdata(dev);
+	const struct oxp_ec_sensor_addr *sensor;
+
+	switch(type) {
+		case hwmon_pwm:
+			switch(attr) {
+				case hwmon_pwm_enable:
+					if (val == 1) {
+						ret = oxp_pwm_enable(board);
+					} else if (val == 0) {
+						ret = oxp_pwm_disable(board);
+					}
+					return ret;
+				case hwmon_pwm_input:
+					for (sensor = board->sensors; board->sensors->type; sensor++) {
+						if (sensor->type == type) {
+							ret = ec_write(sensor->reg, val);
+						}
+					}
+					return ret;
+				default:
+					pr_debug("Unknown attribute for type %d: %d", type, attr);
+					return ret;
+			}
+		default:
+			pr_debug("Unknown sensor type: %d", type);
+	}
+	return ret;
 }
 
 /* Known sensors in the OXP EC controllers */
