@@ -115,8 +115,8 @@ static const struct ec_board_info board_info[] = {
 
 /* Helper functions */
 static int oxp_ec_read_sensor(const struct oxp_ec_sensor_addr *sensors,
-					enum hwmon_sensor_types type,
-					long *val) {
+				enum hwmon_sensor_types type,
+				long *val) {
 	int ret = -1;
 	int i = 0;
 	u8 buffer = 0x00;
@@ -128,11 +128,12 @@ static int oxp_ec_read_sensor(const struct oxp_ec_sensor_addr *sensors,
 		if (sensor->type == type) {
 			reg = sensor->reg;
 			*val = 0;
-			for (i = 0; sensor->size >= i; i++) {
-				ret = ec_read(reg, &buffer);
-				if (!ret)
+			for (i = 0; i < sensor->size; i++) {
+				ret = ec_read(reg + i, &buffer);
+				if (ret)
 					return ret;
-				*val = (*val << i) + buffer;
+				(*val) <<= i*8;
+				*val += buffer;
 			}
 		}
 	}
@@ -195,7 +196,7 @@ static const struct hwmon_channel_info *oxp_platform_sensors[] = {
 	HWMON_CHANNEL_INFO(fan,
 		HWMON_F_INPUT | HWMON_F_MAX | HWMON_F_MIN),
 	HWMON_CHANNEL_INFO(pwm,
-		HWMON_PWM_INPUT),
+		HWMON_PWM_INPUT | HWMON_PWM_ENABLE),
 	NULL
 };
 
@@ -261,8 +262,6 @@ static int __init oxp_platform_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	state->board = *pboard_info;
-
-	printk(KERN_DEBUG "Found board %s\n", state->board.board_names[0]);
 
 	state->lock_data.mutex = 0;
 	state->lock_data.lock = lock_global_acpi_lock;
