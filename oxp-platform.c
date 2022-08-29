@@ -296,6 +296,9 @@ static int oxp_ec_write(struct device *dev, enum hwmon_sensor_types type,
 								dev_warn(dev, "Failed to acquire mutex");
 								return -EBUSY;
 							}
+							if (board->family == family_mini_amd) {
+								val = (val * 100) / 255;
+							}
 
 							ret = ec_write(sensor->reg, val);
 
