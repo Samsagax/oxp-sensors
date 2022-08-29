@@ -223,7 +223,7 @@ static const struct ec_board_info * __init get_board_info(void)
 	const struct ec_board_info *board;
 
 	if (!dmi_board_vendor || !dmi_board_name ||
-	    strcasecmp(dmi_board_vendor, "ONE XPLAYER") ||
+	    strcasecmp(dmi_board_vendor, "ONE-NETBOOK TECHNOLOGY CO., LTD.") ||
 			strcasecmp(dmi_board_vendor, "ONE-NETBOOK"))
 		return NULL;
 

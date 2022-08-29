@@ -29,7 +29,7 @@ endif
 
 DRIVER := oxp-platform
 ifneq ("","$(wildcard .git/*)")
-DRIVER_VERSION := $(shell git describe --long)
+DRIVER_VERSION := $(shell git describe --long --tags)
 else
 ifneq ("", "$(wildcard VERSION)")
 DRIVER_VERSION := $(shell cat VERSION)
