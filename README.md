@@ -39,7 +39,7 @@ To enable manual control of the fan (assuming `hwmon5` is ours):
 
 `# echo 1 > /sys/class/hwmon/hwmon5/pwm1_enable`
 
-Then input values in the range `[0-100]` to the pwm:
+Then input values in the range `[0-255]` to the pwm:
 
 `# echo 100 > /sys/class/hwmon/hwmon5/pwm1`
 
