@@ -204,7 +204,7 @@ static int oxp_ec_read(struct device *dev, enum hwmon_sensor_types type,
 					if (board->family == family_mini_intel) {
 						ret = read_from_ec(OXP_PWM_INTEL_ENABLE_REG, 1, val);
 					} else if (board->family == family_mini_amd) {
-						ret = read_from_ec(OXP_PWM_INTEL_ENABLE_REG, 1, val);
+						ret = read_from_ec(OXP_PWM_AMD_ENABLE_REG, 1, val);
 					} else {
 						ret = -1;
 						pr_debug("Unknown board family, can't read enable PWM");
