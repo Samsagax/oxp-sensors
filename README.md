@@ -29,13 +29,23 @@ $ sudo make dkms
 
 ## Usage
 
-Insert the module with `insmod`.
+Insert the module with `insmod`. Then look for a `hwmon` device with name
+`oxpec`, i.e.:
 
-`sensors` will show the fan RPM as read from the EC. To control it, look for
-a `hwmon` device with name `oxpec`, i.e.:
 `$ cat /sys/class/hwmon/hwmon?/name`
 
-To enable manual control of the fan (assuming `hwmon5` is ours):
+### Reading fan RPM
+
+`sensors` will show the fan RPM as read from the EC. You can also read the
+file `fan1_input` to get the fan RPM.
+
+### Controlling the fan
+
+***Warning: controlling the fan without an accurate reading of the CPU, GPU,
+and Battery temperature can cause irreversible damage to the device. Use at
+your own risk!***
+
+To enable manual control of the fan (assuming `hwmon5` is our driver):
 
 `# echo 1 > /sys/class/hwmon/hwmon5/pwm1_enable`
 
