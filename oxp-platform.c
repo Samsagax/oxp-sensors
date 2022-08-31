@@ -302,9 +302,13 @@ static int oxp_ec_write(struct device *dev, enum hwmon_sensor_types type,
 						ret = oxp_pwm_enable(dev);
 					} else if (val == 0) {
 						ret = oxp_pwm_disable(dev);
+					} else {
+						return -EINVAL;
 					}
 					return ret;
 				case hwmon_pwm_input:
+					if (val < 0 || val > 255)
+						return -EINVAL;
 					for (sensor = board->sensors; sensor->type; sensor++) {
 						if (sensor->type == type) {
 							if (!state->lock_data.lock(&state->lock_data)) {
