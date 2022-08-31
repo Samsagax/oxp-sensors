@@ -34,6 +34,8 @@ Insert the module with `insmod`. Then look for a `hwmon` device with name
 
 `$ cat /sys/class/hwmon/hwmon?/name`
 
+To enable fan control set the parameter `fan_control=1`.
+
 ### Reading fan RPM
 
 `sensors` will show the fan RPM as read from the EC. You can also read the

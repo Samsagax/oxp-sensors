@@ -20,6 +20,10 @@
 #include <linux/platform_device.h>
 #include <asm/processor.h>
 
+static bool fan_control;
+module_param_hw(fan_control, bool, other, 0444);
+MODULE_PARM_DESC(fan_control, "If true, enable fan controls");
+
 #define ACPI_LOCK_DELAY_MS	500
 
 /* Handle ACPI lock mechanism */
@@ -226,6 +230,9 @@ static int oxp_pwm_enable(const struct device *dev)
 	struct oxp_status *state = dev_get_drvdata(dev);
 	const struct ec_board_info *board = &state->board;
 
+	if (!fan_control)
+		return -EINVAL;
+
 	if (!state->lock_data.lock(&state->lock_data)) {
 		dev_warn(dev, "Failed to acquire mutex");
 		return -EBUSY;
@@ -251,6 +258,9 @@ static int oxp_pwm_disable(const struct device *dev)
 	int ret = -1;
 	struct oxp_status *state = dev_get_drvdata(dev);
 	const struct ec_board_info *board = &state->board;
+
+	if (!fan_control)
+		return -EINVAL;
 
 	if (!state->lock_data.lock(&state->lock_data)) {
 		dev_warn(dev, "Failed to acquire mutex");
@@ -284,6 +294,8 @@ static int oxp_ec_write(struct device *dev, enum hwmon_sensor_types type,
 
 	switch(type) {
 		case hwmon_pwm:
+			if (!fan_control)
+				return -EINVAL;
 			switch(attr) {
 				case hwmon_pwm_enable:
 					if (val == 1) {
