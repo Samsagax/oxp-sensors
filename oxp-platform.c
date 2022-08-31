@@ -376,8 +376,7 @@ static const struct ec_board_info * __init get_board_info(void)
 				 dmi_board_name) >= 0) {
 			if (board->family == family_mini_intel &&
 					boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) {
-				printk(KERN_INFO "oxp-platform: Intel boards are not yet supported");
-				return NULL;
+				return board;
 			} else if (board->family == family_mini_amd &&
 					boot_cpu_data.x86_vendor == X86_VENDOR_AMD) {
 				return board;
@@ -397,6 +396,11 @@ static int __init oxp_platform_probe(struct platform_device *pdev)
 	pboard_info = get_board_info();
 	if (!pboard_info)
 		return -ENODEV;
+
+	if (pboard_info->family == family_mini_intel) {
+		dev_err(dev, "Intel boards are not supported");
+		return -ENODEV;
+	}
 
 	state = devm_kzalloc(dev, sizeof(struct oxp_status), GFP_KERNEL);
 	if (!state)
