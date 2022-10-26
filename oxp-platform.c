@@ -1,13 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Platform driver for OXP Handhelds that expose fan readings and controls.
- * Also sets handle for button events if the BIOS version allows it.
+ * Platform driver for OXP Handhelds that expose fan readings and controls
+ * via hwmon sysfs.
+ *
+ * All boards have the same DMI strings and they are told appart by the
+ * boot cpu vendor (Intel/AMD).
+ * Fan control is provided via pwm interface in the range [0-255]. Intel
+ * boards have that range but AMD ones use [0-100] as range, the written
+ * value is scaled to accomodate for that.
+ * Intel boards do not provide fan RPM reading but can be infered by PWM
+ * value set if requested via module parameter (don't report incorrect
+ * valuesby default).
+ * PWM control is disabled by default, can be enabled via module parameter.
  *
  * Copyright (C) 2022 Joaquín I. Aramendía <samsagax@gmail.com>
-
- * EC provides:
- * - Fan Speed
- * - Fan control
  */
 
 #include <linux/acpi.h>
@@ -21,8 +27,12 @@
 #include <asm/processor.h>
 
 static bool fan_control;
-module_param_hw(fan_control, bool, other, 0444);
-MODULE_PARM_DESC(fan_control, "If true, enable fan controls");
+module_param_hw(fan_control, bool, other, 0644);
+MODULE_PARM_DESC(fan_control, "Enable fan control");
+
+static bool fan_input_intel;
+module_param_hw(fan_input_intel, bool, other, 0644);
+MODULE_PARM_DESC(fan_input_intel, "Emulate fan reading on intel boards");
 
 #define ACPI_LOCK_DELAY_MS	500
 
@@ -52,46 +62,63 @@ enum board_family {
 	family_mini_intel,
 };
 
+enum oxp_sensor_type {
+	oxp_sensor_fan = 0,
+	oxp_sensor_pwm,
+	oxp_sensor_number,
+};
+
 struct oxp_ec_sensor_addr {
 	enum hwmon_sensor_types type;
 	u8 reg;
 	short size;
+	union {
+		struct {
+			u8 enable;
+			u8 val_enable;
+			u8 val_disable;
+		};
+		struct {
+		  int max_speed;
+		};
+	};
 };
 
-#define OXP_PWM_AMD_ENABLE_REG 0x4A
-#define OXP_PWM_AMD_ENABLE_VAL 0x01
-#define OXP_PWM_AMD_DISABLE_VAL 0x00
-
-#define OXP_PWM_INTEL_ENABLE_REG 0xc4
-#define OXP_PWM_INTEL_ENABLE_VAL 0x88
-#define OXP_PWM_INTEL_DISABLE_VAL 0xC4
 
 /* AMD board EC addresses */
 static const struct oxp_ec_sensor_addr amd_sensors[] = {
-	{
+	[oxp_sensor_fan] = {
 		.type = hwmon_fan,
 		.reg = 0x76,
 		.size = 2,
+		.max_speed = 5000,
 	},
-	{
+	[oxp_sensor_pwm] = {
 		.type = hwmon_pwm,
 		.reg = 0x4B,
 		.size = 1,
+		.enable = 0x4A,
+		.val_enable = 0x01,
+		.val_disable = 0x00,
 	},
 	{},
 };
 
 /* Intel board EC addresses */
 static const struct oxp_ec_sensor_addr intel_sensors[] = {
-	{
+	[oxp_sensor_fan] = {
 		.type = hwmon_fan,
-		.reg = 0x76,
-		.size = 2,
+		.reg = 0xC5,	/* PWM address if we are emulating RPM */
+		.size = 1,
+		.max_speed = 4700,
 	},
-	{
+	[oxp_sensor_pwm] = {
 		.type = hwmon_pwm,
 		.reg = 0xC5,
 		.size = 1,
+		.enable = 0xcA,
+		.val_enable = 0x88,
+		.val_disable = 0xC4,
 	},
 	{}
 };
@@ -140,19 +167,21 @@ static int read_from_ec(u8 reg, int size, long *val)
 	return ret;
 }
 
-static int oxp_ec_read_sensor(const struct oxp_ec_sensor_addr *sensors,
-				enum hwmon_sensor_types type,
-				long *val)
+static int write_to_ec(const struct device *dev, u8 reg, u8 value)
 {
+	struct oxp_status *state = dev_get_drvdata(dev);
 	int ret = -1;
 
-	/* Search the sensor and read it */
-	const struct oxp_ec_sensor_addr *sensor;
-	for (sensor = sensors; sensor->type; sensor++) {
-		if (sensor->type == type) {
-			ret = read_from_ec(sensor->reg, sensor->size, val);
-		}
+	if (!state->lock_data.lock(&state->lock_data)) {
+		dev_warn(dev, "Failed to acquire mutex");
+		return -EBUSY;
 	}
+
+	ret = ec_write(reg, value);
+
+	if (!state->lock_data.unlock(&state->lock_data))
+		dev_err(dev, "Failed to release mutex");
+
 	return ret;
 }
 
@@ -160,8 +189,13 @@ static int oxp_ec_read_sensor(const struct oxp_ec_sensor_addr *sensors,
 static umode_t oxp_ec_hwmon_is_visible(const void *drvdata,
 					enum hwmon_sensor_types type, u32 attr, int channel)
 {
+	const struct oxp_status *state = drvdata;
+
 	switch (type) {
 		case hwmon_fan:
+			if (!fan_input_intel && state->board.family == family_mini_intel) {
+				return 0;
+			}
 			return S_IRUGO;
 		case hwmon_pwm:
 			return S_IRUGO | S_IWUSR;
@@ -171,7 +205,7 @@ static umode_t oxp_ec_hwmon_is_visible(const void *drvdata,
 	return 0;
 }
 
-static int oxp_ec_read(struct device *dev, enum hwmon_sensor_types type,
+static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 		u32 attr, int channel, long *val)
 {
 	int ret = -1;
@@ -182,44 +216,45 @@ static int oxp_ec_read(struct device *dev, enum hwmon_sensor_types type,
 		case hwmon_fan:
 			switch(attr) {
 				case hwmon_fan_input:
-					ret = oxp_ec_read_sensor(board->sensors, type, val);
+					if (board->family == family_mini_intel && !fan_input_intel) {
+						return -EINVAL;
+					}
+					ret = read_from_ec(board->sensors[oxp_sensor_fan].reg,
+							board->sensors[oxp_sensor_fan].size, val);
+					if (board->family == family_mini_intel) {
+						*val = (*val * board->sensors[oxp_sensor_fan].max_speed) / 255;
+					}
 					break;
 				case hwmon_fan_max:
 					ret = 0;
-					*val = 5000;
+					*val = board->sensors[oxp_sensor_fan].max_speed;
 					break;
 				case hwmon_fan_min:
 					ret = 0;
 					*val = 0;
 					break;
 				default:
-					pr_debug("Unknown attribute for type %d: %d\n", type, attr);
+					dev_dbg(dev, "Unknown attribute for type %d: %d\n", type, attr);
 			}
 			return ret;
 		case hwmon_pwm:
 			switch(attr) {
 				case hwmon_pwm_input:
-					ret = oxp_ec_read_sensor(board->sensors, type, val);
+					ret = read_from_ec(board->sensors[oxp_sensor_pwm].reg,
+							board->sensors[oxp_sensor_pwm].size, val);
 					if (board->family == family_mini_amd) {
 						*val = (*val * 255) / 100;
 					}
 					break;
 				case hwmon_pwm_enable:
-					if (board->family == family_mini_intel) {
-						ret = read_from_ec(OXP_PWM_INTEL_ENABLE_REG, 1, val);
-					} else if (board->family == family_mini_amd) {
-						ret = read_from_ec(OXP_PWM_AMD_ENABLE_REG, 1, val);
-					} else {
-						ret = -1;
-						pr_debug("Unknown board family, can't read enable PWM");
-					}
+					ret = read_from_ec(board->sensors[oxp_sensor_pwm].enable, 1, val);
 					break;
 				default:
-					pr_debug("Unknown attribute for type %d: %d\n", type, attr);
+					dev_dbg(dev, "Unknown attribute for type %d: %d\n", type, attr);
 			}
 			return ret;
 		default:
-			pr_debug("Unknown sensor type %d.\n", type);
+			dev_dbg(dev, "Unknown sensor type %d.\n", type);
 			return -1;
 	}
 }
@@ -233,22 +268,8 @@ static int oxp_pwm_enable(const struct device *dev)
 	if (!fan_control)
 		return -EINVAL;
 
-	if (!state->lock_data.lock(&state->lock_data)) {
-		dev_warn(dev, "Failed to acquire mutex");
-		return -EBUSY;
-	}
-	switch(board->family) {
-		case family_mini_intel:
-			ret = ec_write(OXP_PWM_INTEL_ENABLE_REG, OXP_PWM_INTEL_ENABLE_VAL);
-			break;
-		case family_mini_amd:
-			ret = ec_write(OXP_PWM_AMD_ENABLE_REG, OXP_PWM_AMD_ENABLE_VAL);
-			break;
-		default:
-			pr_debug("Unknown board family");
-	}
-	if (!state->lock_data.unlock(&state->lock_data))
-		dev_err(dev, "Failed to release mutex");
+	ret = write_to_ec(dev, board->sensors[oxp_sensor_pwm].enable,
+		board->sensors[oxp_sensor_pwm].val_enable);
 
 	return ret;
 }
@@ -262,29 +283,13 @@ static int oxp_pwm_disable(const struct device *dev)
 	if (!fan_control)
 		return -EINVAL;
 
-	if (!state->lock_data.lock(&state->lock_data)) {
-		dev_warn(dev, "Failed to acquire mutex");
-		return -EBUSY;
-	}
-
-	switch(board->family) {
-		case family_mini_intel:
-			ret = ec_write(OXP_PWM_INTEL_ENABLE_REG, OXP_PWM_INTEL_DISABLE_VAL);
-			break;
-		case family_mini_amd:
-			ret = ec_write(OXP_PWM_AMD_ENABLE_REG, OXP_PWM_AMD_DISABLE_VAL);
-			break;
-		default:
-			pr_debug("Unknown board family");
-	}
-
-	if (!state->lock_data.unlock(&state->lock_data))
-		dev_err(dev, "Failed to release mutex");
+	ret = write_to_ec(dev, board->sensors[oxp_sensor_pwm].enable,
+		board->sensors[oxp_sensor_pwm].val_disable);
 
 	return ret;
 }
 
-static int oxp_ec_write(struct device *dev, enum hwmon_sensor_types type,
+static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 		u32 attr, int channel, long val)
 {
 	int ret = -1;
@@ -327,11 +332,11 @@ static int oxp_ec_write(struct device *dev, enum hwmon_sensor_types type,
 					}
 					return ret;
 				default:
-					pr_debug("Unknown attribute for type %d: %d", type, attr);
+					dev_dbg(dev, "Unknown attribute for type %d: %d", type, attr);
 					return ret;
 			}
 		default:
-			pr_debug("Unknown sensor type: %d", type);
+			dev_dbg(dev, "Unknown sensor type: %d", type);
 	}
 	return ret;
 }
@@ -347,8 +352,8 @@ static const struct hwmon_channel_info *oxp_platform_sensors[] = {
 
 static const struct hwmon_ops oxp_ec_hwmon_ops = {
 	.is_visible = oxp_ec_hwmon_is_visible,
-	.read = oxp_ec_read,
-	.write = oxp_ec_write,
+	.read = oxp_platform_read,
+	.write = oxp_platform_write,
 };
 
 static const struct hwmon_chip_info oxp_ec_chip_info = {
@@ -397,11 +402,6 @@ static int __init oxp_platform_probe(struct platform_device *pdev)
 	if (!pboard_info)
 		return -ENODEV;
 
-	if (pboard_info->family == family_mini_intel) {
-		dev_err(dev, "Intel boards are not supported");
-		return -ENODEV;
-	}
-
 	state = devm_kzalloc(dev, sizeof(struct oxp_status), GFP_KERNEL);
 	if (!state)
 		return -ENOMEM;
@@ -436,5 +436,5 @@ module_platform_driver_probe(oxp_platform_driver, oxp_platform_probe);
 
 MODULE_AUTHOR("Joaquín I. Aramendía <samsagax@gmail.com>");
 MODULE_DESCRIPTION(
-	"Platform driver that handles ACPI EC of One X Player Devices");
+	"Platform driver that handles ACPI EC of ONEXPLAYER Devices");
 MODULE_LICENSE("GPL");
