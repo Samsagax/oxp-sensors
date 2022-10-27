@@ -304,7 +304,6 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 	int ret = -1;
 	struct oxp_status *state = dev_get_drvdata(dev);
 	const struct ec_board_info *board = &state->board;
-	const struct oxp_ec_sensor_addr *sensor;
 
 	switch(type) {
 		case hwmon_pwm:
