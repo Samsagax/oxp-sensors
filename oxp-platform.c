@@ -265,8 +265,10 @@ static int oxp_pwm_enable(const struct device *dev)
 	struct oxp_status *state = dev_get_drvdata(dev);
 	const struct ec_board_info *board = &state->board;
 
-	if (!fan_control)
-		return -EINVAL;
+	if (!fan_control) {
+		dev_info(dev, "Can't enable pwm, fan_control=0");
+		return -EPERM;
+	}
 
 	ret = write_to_ec(dev, board->sensors[oxp_sensor_pwm].enable,
 		board->sensors[oxp_sensor_pwm].val_enable);
@@ -280,8 +282,10 @@ static int oxp_pwm_disable(const struct device *dev)
 	struct oxp_status *state = dev_get_drvdata(dev);
 	const struct ec_board_info *board = &state->board;
 
-	if (!fan_control)
-		return -EINVAL;
+	if (!fan_control) {
+		dev_info(dev, "Can't disable pwm, fan_control=0");
+		return -EPERM;
+	}
 
 	ret = write_to_ec(dev, board->sensors[oxp_sensor_pwm].enable,
 		board->sensors[oxp_sensor_pwm].val_disable);
@@ -299,8 +303,10 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 
 	switch(type) {
 		case hwmon_pwm:
-			if (!fan_control)
-				return -EINVAL;
+			if (!fan_control) {
+				dev_info(dev, "Can't control fans, fan_control=0");
+				return -EPERM;
+			}
 			switch(attr) {
 				case hwmon_pwm_enable:
 					if (val == 1) {
