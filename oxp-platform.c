@@ -314,22 +314,9 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 				case hwmon_pwm_input:
 					if (val < 0 || val > 255)
 						return -EINVAL;
-					for (sensor = board->sensors; sensor->type; sensor++) {
-						if (sensor->type == type) {
-							if (!state->lock_data.lock(&state->lock_data)) {
-								dev_warn(dev, "Failed to acquire mutex");
-								return -EBUSY;
-							}
-							if (board->family == family_mini_amd) {
-								val = (val * 100) / 255;
-							}
-
-							ret = ec_write(sensor->reg, val);
-
-							if (!state->lock_data.unlock(&state->lock_data))
-								dev_err(dev, "Failed to release mutex");
-						}
-					}
+					if (board->family == family_mini_amd)
+						val = (val * 100) / 255;
+					ret = write_to_ec(dev, board->sensors[oxp_sensor_pwm].reg, val);
 					return ret;
 				default:
 					dev_dbg(dev, "Unknown attribute for type %d: %d", type, attr);
