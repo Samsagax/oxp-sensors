@@ -116,7 +116,7 @@ static const struct oxp_ec_sensor_addr intel_sensors[] = {
 		.type = hwmon_pwm,
 		.reg = 0xC5,
 		.size = 1,
-		.enable = 0xcA,
+		.enable = 0xC4,
 		.val_enable = 0x88,
 		.val_disable = 0xC4,
 	},
@@ -248,6 +248,11 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 					break;
 				case hwmon_pwm_enable:
 					ret = read_from_ec(board->sensors[oxp_sensor_pwm].enable, 1, val);
+					if (*val == board->sensors[oxp_sensor_pwm].val_enable) {
+						*val = 1;
+					} else {
+						*val = 0;
+					}
 					break;
 				default:
 					dev_dbg(dev, "Unknown attribute for type %d: %d\n", type, attr);
