@@ -4,13 +4,10 @@
  * via hwmon sysfs.
  *
  * All boards have the same DMI strings and they are told appart by the
- * boot cpu vendor (Intel/AMD).
- * Fan control is provided via pwm interface in the range [0-255]. Intel
- * boards have that range but AMD ones use [0-100] as range, the written
- * value is scaled to accomodate for that.
- * Intel boards do not provide fan RPM reading but can be infered by PWM
- * value set if requested via module parameter (don't report incorrect
- * valuesby default).
+ * boot cpu vendor (Intel/AMD). Currently only AMD boards are supported.
+ * Fan control is provided via pwm interface in the range [0-255]. AMD
+ * boards [0-100] as range, the written value is scaled to accomodate
+ * for that.
  * PWM control is disabled by default, can be enabled via module parameter.
  *
  * Copyright (C) 2022 Joaquín I. Aramendía <samsagax@gmail.com>
@@ -29,10 +26,6 @@
 static bool fan_control;
 module_param_hw(fan_control, bool, other, 0644);
 MODULE_PARM_DESC(fan_control, "Enable fan control");
-
-static bool fan_input_intel;
-module_param_hw(fan_input_intel, bool, other, 0644);
-MODULE_PARM_DESC(fan_input_intel, "Emulate fan reading on intel boards");
 
 #define ACPI_LOCK_DELAY_MS	500
 
@@ -59,7 +52,6 @@ static bool unlock_global_acpi_lock(struct lock_data *data)
 enum board_family {
 	family_unknown,
 	family_mini_amd,
-	family_mini_intel,
 };
 
 enum oxp_sensor_type {
@@ -104,26 +96,6 @@ static const struct oxp_ec_sensor_addr amd_sensors[] = {
 	{},
 };
 
-/* Intel board EC addresses */
-static const struct oxp_ec_sensor_addr intel_sensors[] = {
-	[oxp_sensor_fan] = {
-		.type = hwmon_fan,
-		.reg = 0xC5,	/* PWM address if we are emulating RPM */
-		.size = 1,
-		.max_speed = 4700,
-	},
-	[oxp_sensor_pwm] = {
-		.type = hwmon_pwm,
-		.reg = 0xC5,
-		.size = 1,
-		.enable = 0xC4,
-		.val_enable = 0x88,
-		.val_disable = 0xC4,
-	},
-	{}
-};
-
-
 struct ec_board_info {
 	const char *board_names[MAX_IDENTICAL_BOARD_VARIATIONS];
 	enum board_family family;
@@ -135,11 +107,6 @@ static const struct ec_board_info board_info[] = {
 		.board_names = {"ONE XPLAYER", "ONEXPLAYER mini A07"},
 		.family = family_mini_amd,
 		.sensors = amd_sensors,
-	},
-	{
-		.board_names = {"ONE XPLAYER"},
-		.family = family_mini_intel,
-		.sensors = intel_sensors,
 	},
 	{}
 };
@@ -189,13 +156,8 @@ static int write_to_ec(const struct device *dev, u8 reg, u8 value)
 static umode_t oxp_ec_hwmon_is_visible(const void *drvdata,
 					enum hwmon_sensor_types type, u32 attr, int channel)
 {
-	const struct oxp_status *state = drvdata;
-
 	switch (type) {
 		case hwmon_fan:
-			if (!fan_input_intel && state->board.family == family_mini_intel) {
-				return 0;
-			}
 			return S_IRUGO;
 		case hwmon_pwm:
 			return S_IRUGO | S_IWUSR;
@@ -216,14 +178,8 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 		case hwmon_fan:
 			switch(attr) {
 				case hwmon_fan_input:
-					if (board->family == family_mini_intel && !fan_input_intel) {
-						return -EINVAL;
-					}
 					ret = read_from_ec(board->sensors[oxp_sensor_fan].reg,
 							board->sensors[oxp_sensor_fan].size, val);
-					if (board->family == family_mini_intel) {
-						*val = (*val * board->sensors[oxp_sensor_fan].max_speed) / 255;
-					}
 					break;
 				case hwmon_fan_max:
 					ret = 0;
@@ -359,7 +315,7 @@ static const struct hwmon_chip_info oxp_ec_chip_info = {
 };
 
 /* Initialization logic */
-static const struct ec_board_info * __init get_board_info(void)
+static const struct ec_board_info * __init get_board_info(struct device *dev)
 {
 	const char *dmi_board_vendor = dmi_get_system_info(DMI_BOARD_VENDOR);
 	const char *dmi_board_name = dmi_get_system_info(DMI_BOARD_NAME);
@@ -376,10 +332,7 @@ static const struct ec_board_info * __init get_board_info(void)
 		if (match_string(board->board_names,
 				 MAX_IDENTICAL_BOARD_VARIATIONS,
 				 dmi_board_name) >= 0) {
-			if (board->family == family_mini_intel &&
-					boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) {
-				return board;
-			} else if (board->family == family_mini_amd &&
+			if (board->family == family_mini_amd &&
 					boot_cpu_data.x86_vendor == X86_VENDOR_AMD) {
 				return board;
 			}
@@ -395,7 +348,7 @@ static int __init oxp_platform_probe(struct platform_device *pdev)
 	const struct ec_board_info *pboard_info;
 	struct oxp_status *state;
 
-	pboard_info = get_board_info();
+	pboard_info = get_board_info(dev);
 	if (!pboard_info)
 		return -ENODEV;
 
@@ -431,7 +384,7 @@ static struct platform_driver oxp_platform_driver = {
 MODULE_DEVICE_TABLE(acpi, acpi_ec_ids);
 module_platform_driver_probe(oxp_platform_driver, oxp_platform_probe);
 
-MODULE_AUTHOR("Joaquín I. Aramendía <samsagax@gmail.com>");
+MODULE_AUTHOR("Joaquín Ignacio Aramendía <samsagax@gmail.com>");
 MODULE_DESCRIPTION(
 	"Platform driver that handles ACPI EC of ONEXPLAYER Devices");
 MODULE_LICENSE("GPL");
