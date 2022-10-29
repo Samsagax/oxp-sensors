@@ -4,7 +4,9 @@
  * via hwmon sysfs.
  *
  * All boards have the same DMI strings and they are told appart by the
- * boot cpu vendor (Intel/AMD). Currently only AMD boards are supported.
+ * boot cpu vendor (Intel/AMD). Currently only AMD boards are supported
+ * but the code is made to be simple to add other handheld boards in the
+ * future.
  * Fan control is provided via pwm interface in the range [0-255]. AMD
  * boards [0-100] as range, the written value is scaled to accomodate
  * for that.
@@ -386,5 +388,5 @@ module_platform_driver_probe(oxp_platform_driver, oxp_platform_probe);
 
 MODULE_AUTHOR("Joaquín Ignacio Aramendía <samsagax@gmail.com>");
 MODULE_DESCRIPTION(
-	"Platform driver that handles ACPI EC of ONEXPLAYER Devices");
+	"Platform driver that handles ACPI EC of OneXPlayer devices");
 MODULE_LICENSE("GPL");

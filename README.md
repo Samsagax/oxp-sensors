@@ -1,8 +1,8 @@
 # Platform driver for OneXPlayer boards
 
 This driver provides functinoality to control the fan in the OneXPlayer mini
-AMD variant. Intel boards are not yet fully supported but preliminary support
-is added, read below.
+AMD variant. Intel boards are not yet supported until I can figure out EC
+registers and values.
 
 ## Build
 If you only want to build and test the module (you need headers for your
@@ -36,12 +36,6 @@ Insert the module with `insmod`. Then look for a `hwmon` device with name
 `$ cat /sys/class/hwmon/hwmon?/name`
 
 To enable fan control set the parameter `fan_control=1`.
-
-### intel boards
-
-Intel boards don't report fan speed on EC registers, but a workaround can be
-enabled by setting `fan_input_intel=1`. This will infer the fan speed by
-factoring the pwm read value. Use with care.
 
 ### Reading fan RPM
 
