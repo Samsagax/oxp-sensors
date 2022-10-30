@@ -27,7 +27,7 @@ else
 SYSTEM_MAP = /proc/kallsyms
 endif
 
-DRIVER := oxp-platform
+DRIVER := oxp-sensors
 ifneq ("","$(wildcard .git/*)")
 DRIVER_VERSION := $(shell git describe --long --tags)
 else
@@ -40,7 +40,7 @@ endif
 
 # DKMS
 DKMS_ROOT_PATH=/usr/src/$(DRIVER)-$(DRIVER_VERSION)
-MODPROBE_OUTPUT=$(shell lsmod | grep oxp-platform)
+MODPROBE_OUTPUT=$(shell lsmod | grep oxp-sensors)
 
 # Directory below /lib/modules/$(TARGET)/kernel into which to install
 # the module:
@@ -95,7 +95,7 @@ dkms:
 	@cp `pwd`/dkms.conf $(DKMS_ROOT_PATH)
 	@cp `pwd`/VERSION $(DKMS_ROOT_PATH)
 	@cp `pwd`/Makefile $(DKMS_ROOT_PATH)
-	@cp `pwd`/oxp-platform.c $(DKMS_ROOT_PATH)
+	@cp `pwd`/oxp-sensors.c $(DKMS_ROOT_PATH)
 	@dkms add -m $(DRIVER) -v $(DRIVER_VERSION)
 	@dkms build -m $(DRIVER) -v $(DRIVER_VERSION) --kernelsourcedir=$(KERNEL_BUILD)
 	@dkms install --force -m $(DRIVER) -v $(DRIVER_VERSION)
