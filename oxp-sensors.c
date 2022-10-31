@@ -44,8 +44,9 @@ static bool unlock_global_acpi_lock(struct lock_data *data)
 	return ACPI_SUCCESS(acpi_release_global_lock(data->mutex));
 }
 
-#define OXP_SENSOR_FAN_REG	0x76 /* Fan reading is 2 registers long */
-#define OXP_SENSOR_PWM_REG	0x4B /* PWM reading is 1 register long */
+#define OXP_SENSOR_FAN_REG		0x76 /* Fan reading is 2 registers long */
+#define OXP_SENSOR_PWM_ENABLE_REG	0x4A /* PWM enable is 1 register long */
+#define OXP_SENSOR_PWM_REG		0x4B /* PWM reading is 1 register long */
 
 static const struct dmi_system_id dmi_table[] = {
 	{
@@ -105,12 +106,12 @@ static int write_to_ec(const struct device *dev, u8 reg, u8 value)
 
 static int oxp_pwm_enable(const struct device *dev)
 {
-	return write_to_ec(dev, OXP_SENSOR_PWM_REG, 0x01);
+	return write_to_ec(dev, OXP_SENSOR_PWM_ENABLE_REG, 0x01);
 }
 
 static int oxp_pwm_disable(const struct device *dev)
 {
-	return write_to_ec(dev, OXP_SENSOR_PWM_REG, 0x00);
+	return write_to_ec(dev, OXP_SENSOR_PWM_ENABLE_REG, 0x00);
 }
 
 /* Callbacks for hwmon interface */
@@ -152,7 +153,7 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 			*val = (*val * 255) / 100;
 			return ret;
 		case hwmon_pwm_enable:
-			return read_from_ec(OXP_SENSOR_PWM_REG, 1, val);
+			return read_from_ec(OXP_SENSOR_PWM_ENABLE_REG, 1, val);
 		default:
 			dev_dbg(dev, "Unknown attribute for type %d: %d\n", type, attr);
 			return -EOPNOTSUPP;
