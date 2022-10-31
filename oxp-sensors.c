@@ -11,8 +11,6 @@
  * boards use [0-100] as range in the EC, the written value is scaled to
  * accommodate for that.
  *
- * PWM control is disabled by default, can be enabled via module parameter.
- *
  * Copyright (C) 2022 Joaquín I. Aramendía <samsagax@gmail.com>
  */
 
@@ -197,7 +195,7 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 /* Known sensors in the OXP EC controllers */
 static const struct hwmon_channel_info *oxp_platform_sensors[] = {
 	HWMON_CHANNEL_INFO(fan,
-		HWMON_F_INPUT | HWMON_F_MAX | HWMON_F_MIN),
+		HWMON_F_INPUT),
 	HWMON_CHANNEL_INFO(pwm,
 		HWMON_PWM_INPUT | HWMON_PWM_ENABLE),
 	NULL,
