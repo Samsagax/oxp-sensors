@@ -115,7 +115,6 @@ static umode_t oxp_ec_hwmon_is_visible(const void *drvdata,
 	default:
 		return 0;
 	}
-	return 0;
 }
 
 static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
@@ -129,22 +128,26 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 		case hwmon_fan_input:
 			return read_from_ec(OXP_SENSOR_FAN_REG, 2, val);
 		default:
+			break;
 		}
 		break;
 	case hwmon_pwm:
 		switch (attr) {
 		case hwmon_pwm_input:
 			ret = read_from_ec(OXP_SENSOR_PWM_REG, 2, val);
+			if (ret)
+				return ret;
 			*val = (*val * 255) / 100;
-			return ret;
+			return 0;
 		case hwmon_pwm_enable:
 			return read_from_ec(OXP_SENSOR_PWM_ENABLE_REG, 1, val);
 		default:
+			break;
 		}
 		break;
 	default:
+		break;
 	}
-	dev_dbg(dev, "Unknown attribute for type %d: %d\n", type, attr);
 	return -EOPNOTSUPP;
 }
 
@@ -159,8 +162,7 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 				return oxp_pwm_enable(dev);
 			else if (val == 0)
 				return oxp_pwm_disable(dev);
-			else
-				return -EINVAL;
+			return -EINVAL;
 		case hwmon_pwm_input:
 			if (val < 0 || val > 255)
 				return -EINVAL;
@@ -169,9 +171,10 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 		default:
 			break;
 		}
+		break;
 	default:
+		break;
 	}
-	dev_dbg(dev, "Unknown sensor type: %d", type);
 	return -EOPNOTSUPP;
 }
 
@@ -202,7 +205,8 @@ static int oxp_platform_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct device *hwdev;
 
-	/* Have to check for AMD processor here because DMI strings are the
+	/*
+	 * Have to check for AMD processor here because DMI strings are the
 	 * same between Intel and AMD boards, the only way to tell them appart
 	 * is the CPU.
 	 * Intel boards seem to have different EC registers and values to
@@ -225,29 +229,8 @@ static struct platform_driver oxp_platform_driver = {
 	.probe = oxp_platform_probe,
 };
 
-static struct platform_device *oxp_platform_device;
-
-static int __init oxp_platform_init(void)
-{
-	oxp_platform_device =
-		platform_create_bundle(&oxp_platform_driver,
-				       oxp_platform_probe, NULL, 0, NULL, 0);
-
-	if (IS_ERR(oxp_platform_device))
-		return PTR_ERR(oxp_platform_device);
-
-	return 0;
-}
-
-static void __exit oxp_platform_exit(void)
-{
-	platform_device_unregister(oxp_platform_device);
-	platform_driver_unregister(&oxp_platform_driver);
-}
-
 MODULE_DEVICE_TABLE(dmi, dmi_table);
-module_init(oxp_platform_init);
-module_exit(oxp_platform_exit);
+module_platform_driver(oxp_platform_driver);
 
 MODULE_AUTHOR("Joaquín Ignacio Aramendía <samsagax@gmail.com>");
 MODULE_DESCRIPTION("Platform driver that handles EC sensors of OneXPlayer devices");
