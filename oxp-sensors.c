@@ -229,8 +229,33 @@ static struct platform_driver oxp_platform_driver = {
 	.probe = oxp_platform_probe,
 };
 
+static struct platform_device *oxp_platform_device;
+
+static int __init oxp_platform_init(void)
+{
+	oxp_platform_device =
+		platform_create_bundle(&oxp_platform_driver,
+				       oxp_platform_probe, NULL, 0, NULL, 0);
+
+	return PTR_ERR_OR_ZERO(oxp_platform_device);
+}
+
+static void __exit oxp_platform_exit(void)
+{
+	platform_device_unregister(oxp_platform_device);
+	platform_driver_unregister(&oxp_platform_driver);
+}
+
 MODULE_DEVICE_TABLE(dmi, dmi_table);
-module_platform_driver(oxp_platform_driver);
+
+/*
+ * module_platform_driver() may be used here but somehow it breaks the module
+ * either by preventing it from loading or not exposing hwmon attributes.
+ * Either way I'm not smart enough to figure it out so I'll leave init/exit
+ * macros for now.
+ */
+module_init(oxp_platform_init);
+module_exit(oxp_platform_exit);
 
 MODULE_AUTHOR("Joaquín Ignacio Aramendía <samsagax@gmail.com>");
 MODULE_DESCRIPTION("Platform driver that handles EC sensors of OneXPlayer devices");
