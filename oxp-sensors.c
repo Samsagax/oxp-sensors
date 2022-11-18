@@ -141,7 +141,7 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 			ret = read_from_ec(OXP_SENSOR_PWM_REG, 2, val);
 			if (ret)
 				return ret;
-			*val = (*val * 255) / 100;
+			//*val = (*val * 255) / 100;
 			return 0;
 		case hwmon_pwm_enable:
 			return read_from_ec(OXP_SENSOR_PWM_ENABLE_REG, 1, val);
@@ -170,7 +170,7 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 		case hwmon_pwm_input:
 			//if (val < 0 || val > 255)
 				//return -EINVAL;
-			val = (val * 100) / 255;
+			//val = (val * 100) / 255;
 			return write_to_ec(dev, OXP_SENSOR_PWM_REG, val);
 		default:
 			break;
