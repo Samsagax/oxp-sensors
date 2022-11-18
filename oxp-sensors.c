@@ -168,8 +168,8 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 				return oxp_pwm_disable(dev);
 			return -EINVAL;
 		case hwmon_pwm_input:
-			if (val < 0 || val > 255)
-				return -EINVAL;
+			//if (val < 0 || val > 255)
+				//return -EINVAL;
 			val = (val * 100) / 255;
 			return write_to_ec(dev, OXP_SENSOR_PWM_REG, val);
 		default:
