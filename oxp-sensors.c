@@ -40,8 +40,8 @@ static bool unlock_global_acpi_lock(void)
 }
 
 enum oxp_board {
-	oxp_mini_amd = 1,
-	aok_zoe_a1,
+	aok_zoe_a1 = 1,
+	oxp_mini_amd,
 };
 
 static enum oxp_board board;
