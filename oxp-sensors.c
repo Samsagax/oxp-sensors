@@ -56,14 +56,14 @@ static const struct dmi_system_id dmi_table[] = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "AOKZOE"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AOKZOE A1 AR07"),
 		},
-		.driver_data = (void *) aok_zoe_a1,
+		.driver_data = (void *) &(enum oxp_board) {aok_zoe_a1},
 	},
 	{
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "ONE-NETBOOK"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "ONE XPLAYER"),
 		},
-		.driver_data = (void *) oxp_mini_amd,
+		.driver_data = (void *) &(enum oxp_board) {oxp_mini_amd},
 	},
 	{},
 };
