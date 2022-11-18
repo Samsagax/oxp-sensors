@@ -46,12 +46,12 @@ static bool unlock_global_acpi_lock(void)
 static const struct dmi_system_id dmi_table[] = {
 	{
 		.matches = {
-			DMI_MATCH(DMI_BOARD_VENDOR, "ONE-NETBOOK"),
-			DMI_EXACT_MATCH(DMI_BOARD_NAME, "ONE XPLAYER"),
-		},
-		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "AOKZOE"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AOKZOE A1 AR07"),
+		},
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "ONE-NETBOOK"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "ONE XPLAYER"),
 		},
 	},
 	{},
