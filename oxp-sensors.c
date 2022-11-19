@@ -39,6 +39,13 @@ static bool unlock_global_acpi_lock(void)
 	return ACPI_SUCCESS(acpi_release_global_lock(oxp_mutex));
 }
 
+enum oxp_board {
+	aok_zoe_a1 = 1,
+	oxp_mini_amd,
+};
+
+static enum oxp_board board;
+
 #define OXP_SENSOR_FAN_REG		0x76 /* Fan reading is 2 registers long */
 #define OXP_SENSOR_PWM_ENABLE_REG	0x4A /* PWM enable is 1 register long */
 #define OXP_SENSOR_PWM_REG		0x4B /* PWM reading is 1 register long */
@@ -46,9 +53,17 @@ static bool unlock_global_acpi_lock(void)
 static const struct dmi_system_id dmi_table[] = {
 	{
 		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AOKZOE"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AOKZOE A1 AR07"),
+		},
+		.driver_data = (void *) &(enum oxp_board) {aok_zoe_a1},
+	},
+	{
+		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "ONE-NETBOOK"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "ONE XPLAYER"),
 		},
+		.driver_data = (void *) &(enum oxp_board) {oxp_mini_amd},
 	},
 	{},
 };
@@ -137,7 +152,8 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 			ret = read_from_ec(OXP_SENSOR_PWM_REG, 2, val);
 			if (ret)
 				return ret;
-			*val = (*val * 255) / 100;
+			if (board == oxp_mini_amd)
+				*val = (*val * 255) / 100;
 			return 0;
 		case hwmon_pwm_enable:
 			return read_from_ec(OXP_SENSOR_PWM_ENABLE_REG, 1, val);
@@ -166,7 +182,8 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 		case hwmon_pwm_input:
 			if (val < 0 || val > 255)
 				return -EINVAL;
-			val = (val * 100) / 255;
+			if (board == oxp_mini_amd)
+				val = (val * 100) / 255;
 			return write_to_ec(dev, OXP_SENSOR_PWM_REG, val);
 		default:
 			break;
@@ -215,6 +232,9 @@ static int oxp_platform_probe(struct platform_device *pdev)
 	dmi_entry = dmi_first_match(dmi_table);
 	if (!dmi_entry || boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
 		return -ENODEV;
+
+	board = *((enum oxp_board *) dmi_entry->driver_data);
+	dev_info(dev, "Board: %i", board);
 
 	hwdev = devm_hwmon_device_register_with_info(dev, "oxpec", NULL,
 						     &oxp_ec_chip_info, NULL);
