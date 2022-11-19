@@ -42,6 +42,7 @@ static bool unlock_global_acpi_lock(void)
 enum oxp_board {
 	aok_zoe_a1 = 1,
 	oxp_mini_amd,
+	oxp_mini_amd_pro,
 };
 
 static enum oxp_board board;
@@ -64,6 +65,13 @@ static const struct dmi_system_id dmi_table[] = {
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "ONE XPLAYER"),
 		},
 		.driver_data = (void *) &(enum oxp_board) {oxp_mini_amd},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "ONE-NETBOOK"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "ONEXPLAYER Mini Pro"),
+		},
+		.driver_data = (void *) &(enum oxp_board) {oxp_mini_amd_pro},
 	},
 	{},
 };
