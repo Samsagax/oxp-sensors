@@ -4,28 +4,39 @@ This driver provides functinoality to control the fan in the OneXPlayer mini
 AMD variant. Intel boards are not yet supported until I can figure out EC
 registers and values.
 
+Supported devices include:
+
+ - AOK ZOE A1
+ - OneXPlayer AMD
+ - OneXPlayer mini AMD
+ - OneXPlayer mini AMD PRO
+
 ## Build
 If you only want to build and test the module (you need headers for your
 kernel):
 
-```
+```shell
 $ git clone https://gitlab.com/Samsagax/oxp-platform-dkms.git
 $ cd oxp-platform-dkms
 $ make
 ```
 
-Then insert the module and check `sensors` and `dmesg` if appropriate.
+Then insert the module and check `sensors` and `dmesg` if appropriate:
+```shell
+# insmod oxp-sensors.ko
+$ sensors
+```
 
 ## Install
 
 You'll need appropriate headers for your kernel and `dkms` package from your
 distribution.
 
-```
+```shell
 $ git clone https://gitlab.com/Samsagax/oxp-platform-dkms.git
 $ cd oxp-platform-dkms
 $ make
-$ sudo make dkms
+# make dkms
 ```
 
 ## Usage
@@ -34,8 +45,6 @@ Insert the module with `insmod`. Then look for a `hwmon` device with name
 `oxpec`, i.e.:
 
 `$ cat /sys/class/hwmon/hwmon?/name`
-
-To enable fan control set the parameter `fan_control=1`.
 
 ### Reading fan RPM
 
@@ -48,7 +57,8 @@ file `fan1_input` to get the fan RPM.
 and Battery temperature can cause irreversible damage to the device. Use at
 your own risk!***
 
-To enable manual control of the fan (assuming `hwmon5` is our driver):
+To enable manual control of the fan (assuming `hwmon5` is our driver, look for
+`oxpec` in the `name` file):
 
 `# echo 1 > /sys/class/hwmon/hwmon5/pwm1_enable`
 
