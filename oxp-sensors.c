@@ -3,13 +3,14 @@
  * Platform driver for OXP Handhelds that expose fan reading and control
  * via hwmon sysfs.
  *
- * All boards have the same DMI strings and they are told appart by the
+ * Old boards have the same DMI strings and they are told appart by the
  * boot cpu vendor (Intel/AMD). Currently only AMD boards are supported
  * but the code is made to be simple to add other handheld boards in the
  * future.
- * Fan control is provided via pwm interface in the range [0-255]. AMD
- * boards use [0-100] as range in the EC, the written value is scaled to
- * accommodate for that.
+ * Fan control is provided via pwm interface in the range [0-255].
+ * Old AMD boards use [0-100] as range in the EC, the written value is
+ * scaled to accommodate for that. Newer boards like the mini PRO and
+ * AOK ZOE are not scaled but have the same EC layout.
  *
  * Copyright (C) 2022 Joaquín I. Aramendía <samsagax@gmail.com>
  */
@@ -157,7 +158,7 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 	case hwmon_pwm:
 		switch (attr) {
 		case hwmon_pwm_input:
-			ret = read_from_ec(OXP_SENSOR_PWM_REG, 2, val);
+			ret = read_from_ec(OXP_SENSOR_PWM_REG, 1, val);
 			if (ret)
 				return ret;
 			if (board == oxp_mini_amd)
@@ -242,7 +243,6 @@ static int oxp_platform_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 	board = *((enum oxp_board *) dmi_entry->driver_data);
-	dev_info(dev, "Board: %i", board);
 
 	hwdev = devm_hwmon_device_register_with_info(dev, "oxpec", NULL,
 						     &oxp_ec_chip_info, NULL);
@@ -276,12 +276,6 @@ static void __exit oxp_platform_exit(void)
 
 MODULE_DEVICE_TABLE(dmi, dmi_table);
 
-/*
- * module_platform_driver() may be used here but somehow it breaks the module
- * either by preventing it from loading or not exposing hwmon attributes.
- * Either way I'm not smart enough to figure it out so I'll leave init/exit
- * macros for now.
- */
 module_init(oxp_platform_init);
 module_exit(oxp_platform_exit);
 
