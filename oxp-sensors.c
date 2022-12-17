@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Platform driver for OXP Handhelds that expose fan reading and control
- * via hwmon sysfs.
+ * Platform driver for Handhelds that expose fan reading and control via
+ * hwmon sysfs.
  *
- * Old boards have the same DMI strings and they are told appart by the
- * boot cpu vendor (Intel/AMD). Currently only AMD boards are supported
- * but the code is made to be simple to add other handheld boards in the
- * future.
+ * Old OXP boards have the same DMI strings and they are told appart by
+ * the boot cpu vendor (Intel/AMD). Currently only AMD boards are
+ * supported but the code is made to be simple to add other handheld
+ * boards in the future.
  * Fan control is provided via pwm interface in the range [0-255].
  * Old AMD boards use [0-100] as range in the EC, the written value is
  * scaled to accommodate for that. Newer boards like the mini PRO and
@@ -42,6 +42,8 @@ static bool unlock_global_acpi_lock(void)
 
 enum oxp_board {
 	aok_zoe_a1 = 1,
+	aya_neo_air,
+	aya_neo_air_pro,
 	oxp_mini_amd,
 	oxp_mini_amd_pro,
 };
@@ -59,6 +61,20 @@ static const struct dmi_system_id dmi_table[] = {
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AOKZOE A1 AR07"),
 		},
 		.driver_data = (void *) &(enum oxp_board) {aok_zoe_a1},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AIR"),
+		},
+		.driver_data = (void *) &(enum oxp_board) {aya_neo_air},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AIR Pro"),
+		},
+		.driver_data = (void *) &(enum oxp_board) {aya_neo_air_pro},
 	},
 	{
 		.matches = {
@@ -161,8 +177,19 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 			ret = read_from_ec(OXP_SENSOR_PWM_REG, 1, val);
 			if (ret)
 				return ret;
-			if (board == oxp_mini_amd)
+			switch (board) {
+			case aok_zoe_a1:
+				break;
+			case aya_neo_air:
+			case aya_neo_air_pro:
+			case oxp_mini_amd:
 				*val = (*val * 255) / 100;
+				break;
+			case oxp_mini_amd_pro:
+				break;
+			default:
+				break;
+			}
 			return 0;
 		case hwmon_pwm_enable:
 			return read_from_ec(OXP_SENSOR_PWM_ENABLE_REG, 1, val);
@@ -191,8 +218,19 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 		case hwmon_pwm_input:
 			if (val < 0 || val > 255)
 				return -EINVAL;
-			if (board == oxp_mini_amd)
+			switch (board) {
+			case aok_zoe_a1:
+				break;
+			case aya_neo_air:
+			case aya_neo_air_pro:
+			case oxp_mini_amd:
 				val = (val * 100) / 255;
+				break;
+			case oxp_mini_amd_pro:
+				break;
+			default:
+				break;
+			}
 			return write_to_ec(dev, OXP_SENSOR_PWM_REG, val);
 		default:
 			break;
