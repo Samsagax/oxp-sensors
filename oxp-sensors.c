@@ -42,8 +42,10 @@ static bool unlock_global_acpi_lock(void)
 
 enum oxp_board {
 	aok_zoe_a1 = 1,
+	aya_neo_2,
 	aya_neo_air,
 	aya_neo_air_pro,
+	aya_neo_geek,
 	oxp_mini_amd,
 	oxp_mini_amd_pro,
 };
@@ -65,6 +67,13 @@ static const struct dmi_system_id dmi_table[] = {
 	{
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AYANEO 2"),
+		},
+		.driver_data = (void *) &(enum oxp_board) {aya_neo_2},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AIR"),
 		},
 		.driver_data = (void *) &(enum oxp_board) {aya_neo_air},
@@ -75,6 +84,13 @@ static const struct dmi_system_id dmi_table[] = {
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AIR Pro"),
 		},
 		.driver_data = (void *) &(enum oxp_board) {aya_neo_air_pro},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "GEEK"),
+		},
+		.driver_data = (void *) &(enum oxp_board) {aya_neo_geek},
 	},
 	{
 		.matches = {
@@ -180,8 +196,10 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 			switch (board) {
 			case aok_zoe_a1:
 				break;
+			case aya_neo_2:
 			case aya_neo_air:
 			case aya_neo_air_pro:
+			case aya_neo_geek:
 			case oxp_mini_amd:
 				*val = (*val * 255) / 100;
 				break;
@@ -221,8 +239,10 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 			switch (board) {
 			case aok_zoe_a1:
 				break;
+			case aya_neo_2:
 			case aya_neo_air:
 			case aya_neo_air_pro:
+			case aya_neo_geek:
 			case oxp_mini_amd:
 				val = (val * 100) / 255;
 				break;
