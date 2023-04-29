@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Platform driver for Handhelds that expose fan reading and control via
- * hwmon sysfs.
+ * Platform driver for OneXPlayer, AOK ZOE, and Aya Neo Handhelds that expose
+ * fan reading and control via hwmon sysfs.
  *
- * Old OXP boards have the same DMI strings and they are told appart by
+ * Old OXP boards have the same DMI strings and they are told apart by
  * the boot cpu vendor (Intel/AMD). Currently only AMD boards are
  * supported but the code is made to be simple to add other handheld
  * boards in the future.
@@ -62,49 +62,49 @@ static const struct dmi_system_id dmi_table[] = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "AOKZOE"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AOKZOE A1 AR07"),
 		},
-		.driver_data = (void *) &(enum oxp_board) {aok_zoe_a1},
+		.driver_data = (void *)aok_zoe_a1,
 	},
 	{
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AYANEO 2"),
 		},
-		.driver_data = (void *) &(enum oxp_board) {aya_neo_2},
+		.driver_data = (void *)aya_neo_2,
 	},
 	{
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AIR"),
 		},
-		.driver_data = (void *) &(enum oxp_board) {aya_neo_air},
+		.driver_data = (void *)aya_neo_air,
 	},
 	{
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AIR Pro"),
 		},
-		.driver_data = (void *) &(enum oxp_board) {aya_neo_air_pro},
+		.driver_data = (void *)aya_neo_air_pro,
 	},
 	{
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "GEEK"),
 		},
-		.driver_data = (void *) &(enum oxp_board) {aya_neo_geek},
+		.driver_data = (void *)aya_neo_geek,
 	},
 	{
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "ONE-NETBOOK"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "ONE XPLAYER"),
 		},
-		.driver_data = (void *) &(enum oxp_board) {oxp_mini_amd},
+		.driver_data = (void *)oxp_mini_amd,
 	},
 	{
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "ONE-NETBOOK"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "ONEXPLAYER Mini Pro"),
 		},
-		.driver_data = (void *) &(enum oxp_board) {oxp_mini_amd_pro},
+		.driver_data = (void *)oxp_mini_amd_pro,
 	},
 	{},
 };
@@ -194,8 +194,6 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 			if (ret)
 				return ret;
 			switch (board) {
-			case aok_zoe_a1:
-				break;
 			case aya_neo_2:
 			case aya_neo_air:
 			case aya_neo_air_pro:
@@ -204,7 +202,7 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 				*val = (*val * 255) / 100;
 				break;
 			case oxp_mini_amd_pro:
-				break;
+			case aok_zoe_a1:
 			default:
 				break;
 			}
@@ -237,8 +235,6 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 			if (val < 0 || val > 255)
 				return -EINVAL;
 			switch (board) {
-			case aok_zoe_a1:
-				break;
 			case aya_neo_2:
 			case aya_neo_air:
 			case aya_neo_air_pro:
@@ -246,8 +242,8 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 			case oxp_mini_amd:
 				val = (val * 100) / 255;
 				break;
+			case aok_zoe_a1:
 			case oxp_mini_amd_pro:
-				break;
 			default:
 				break;
 			}
@@ -263,7 +259,7 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 }
 
 /* Known sensors in the OXP EC controllers */
-static const struct hwmon_channel_info *oxp_platform_sensors[] = {
+static const struct hwmon_channel_info * const oxp_platform_sensors[] = {
 	HWMON_CHANNEL_INFO(fan,
 			   HWMON_F_INPUT),
 	HWMON_CHANNEL_INFO(pwm,
@@ -291,7 +287,7 @@ static int oxp_platform_probe(struct platform_device *pdev)
 
 	/*
 	 * Have to check for AMD processor here because DMI strings are the
-	 * same between Intel and AMD boards, the only way to tell them appart
+	 * same between Intel and AMD boards, the only way to tell them apart
 	 * is the CPU.
 	 * Intel boards seem to have different EC registers and values to
 	 * read/write.
@@ -300,7 +296,7 @@ static int oxp_platform_probe(struct platform_device *pdev)
 	if (!dmi_entry || boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
 		return -ENODEV;
 
-	board = *((enum oxp_board *) dmi_entry->driver_data);
+	board = (enum oxp_board)dmi_entry->driver_data;
 
 	hwdev = devm_hwmon_device_register_with_info(dev, "oxpec", NULL,
 						     &oxp_ec_chip_info, NULL);
