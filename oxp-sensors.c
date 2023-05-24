@@ -53,9 +53,22 @@ enum oxp_board {
 
 static enum oxp_board board;
 
+/* Fan reading and PWM */
 #define OXP_SENSOR_FAN_REG		0x76 /* Fan reading is 2 registers long */
 #define OXP_SENSOR_PWM_ENABLE_REG	0x4A /* PWM enable is 1 register long */
 #define OXP_SENSOR_PWM_REG		0x4B /* PWM reading is 1 register long */
+
+/* Turbo button takeover function
+ * Older boards have different values and EC registers
+ * for the same function
+*/
+#define OXP_OLD_TURBO_SWITCH_REG	0x1E
+#define OXP_OLD_TURBO_TAKE_VAL		0x01
+#define OXP_OLD_TURBO_RETURN_VAL	0x00
+
+#define OXP_TURBO_SWITCH_REG		0xF1
+#define OXP_TURBO_TAKE_VAL		0x40
+#define OXP_TURBO_RETURN_VAL		0x00
 
 static const struct dmi_system_id dmi_table[] = {
 	{
@@ -157,6 +170,107 @@ static int write_to_ec(u8 reg, u8 value)
 	return ret;
 }
 
+/* Turbo button toggle functions */
+static int oxp_tt_toggle_enable(void)
+{
+	u8 reg;
+	u8 val;
+
+	switch (board) {
+	case oxp_mini_amd_a07:
+		reg = OXP_OLD_TURBO_SWITCH_REG;
+		val = OXP_OLD_TURBO_TAKE_VAL;
+		break;
+	case oxp_mini_amd_pro:
+	case aok_zoe_a1:
+		reg = OXP_TURBO_SWITCH_REG;
+		val = OXP_TURBO_TAKE_VAL;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return write_to_ec(reg, val);
+}
+
+static int oxp_tt_toggle_disable(void)
+{
+	u8 reg;
+	u8 val;
+
+	switch (board) {
+	case oxp_mini_amd_a07:
+		reg = OXP_OLD_TURBO_SWITCH_REG;
+		val = OXP_OLD_TURBO_RETURN_VAL;
+		break;
+	case oxp_mini_amd_pro:
+	case aok_zoe_a1:
+		reg = OXP_TURBO_SWITCH_REG;
+		val = OXP_TURBO_RETURN_VAL;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return write_to_ec(reg, val);
+}
+
+/* Callbacks for turbo toggle attribute */
+static ssize_t oxp_tt_toggle_store(struct device *dev,
+        struct device_attribute *attr, const char *buf, size_t count)
+{
+	int rval;
+	unsigned int value;
+
+	rval = kstrtouint(buf, 10, &value);
+	if (rval)
+		return rval;
+
+	switch (value) {
+	case 0:
+		rval = oxp_tt_toggle_disable();
+		if (rval)
+			return rval;
+		return count;
+	case 1:
+		rval = oxp_tt_toggle_enable();
+		if (rval)
+			return rval;
+		return count;
+	default:
+		return -EINVAL;
+	}
+}
+
+static ssize_t oxp_tt_toggle_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	int retval;
+	u8 reg;
+	long val;
+
+	switch (board) {
+	case oxp_mini_amd_a07:
+		reg = OXP_OLD_TURBO_SWITCH_REG;
+		val = OXP_OLD_TURBO_RETURN_VAL;
+		break;
+	case oxp_mini_amd_pro:
+	case aok_zoe_a1:
+		reg = OXP_TURBO_SWITCH_REG;
+		val = OXP_TURBO_RETURN_VAL;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	retval = read_from_ec(reg, 1, &val);
+	if (retval)
+		return retval;
+
+	return sysfs_emit(buf, "%ld\n", val);
+}
+
+static DEVICE_ATTR(tt_toggle, 0644, oxp_tt_toggle_show, oxp_tt_toggle_store);
+
+/* PWM enable/disable functions */
 static int oxp_pwm_enable(void)
 {
 	return write_to_ec(OXP_SENSOR_PWM_ENABLE_REG, 0x01);
@@ -277,6 +391,13 @@ static const struct hwmon_channel_info * const oxp_platform_sensors[] = {
 	NULL,
 };
 
+static struct attribute *oxp_ec_attrs[] = {
+    &dev_attr_tt_toggle.attr,
+    NULL
+};
+
+ATTRIBUTE_GROUPS(oxp_ec);
+
 static const struct hwmon_ops oxp_ec_hwmon_ops = {
 	.is_visible = oxp_ec_hwmon_is_visible,
 	.read = oxp_platform_read,
@@ -308,8 +429,17 @@ static int oxp_platform_probe(struct platform_device *pdev)
 
 	board = (enum oxp_board)(unsigned long)dmi_entry->driver_data;
 
-	hwdev = devm_hwmon_device_register_with_info(dev, "oxpec", NULL,
-						     &oxp_ec_chip_info, NULL);
+	switch (board) {
+	case aok_zoe_a1:
+	case oxp_mini_amd_a07:
+	case oxp_mini_amd_pro:
+		hwdev = devm_hwmon_device_register_with_info(dev, "oxpec", NULL,
+							     &oxp_ec_chip_info, oxp_ec_groups);
+		break;
+	default:
+		hwdev = devm_hwmon_device_register_with_info(dev, "oxpec", NULL,
+							     &oxp_ec_chip_info, NULL);
+	}
 
 	return PTR_ERR_OR_ZERO(hwdev);
 }
