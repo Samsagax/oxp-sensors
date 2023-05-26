@@ -303,7 +303,7 @@ static int oxp_platform_probe(struct platform_device *pdev)
 	if (!dmi_entry || boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
 		return -ENODEV;
 
-	board = (enum oxp_board)dmi_entry->driver_data;
+	board = (enum oxp_board)(unsigned long)dmi_entry->driver_data;
 
 	hwdev = devm_hwmon_device_register_with_info(dev, "oxpec", NULL,
 						     &oxp_ec_chip_info, NULL);
