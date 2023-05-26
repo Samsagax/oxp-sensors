@@ -47,6 +47,7 @@ enum oxp_board {
 	aya_neo_air_pro,
 	aya_neo_geek,
 	oxp_mini_amd,
+	oxp_mini_amd_a07,
 	oxp_mini_amd_pro,
 };
 
@@ -104,7 +105,7 @@ static const struct dmi_system_id dmi_table[] = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "ONE-NETBOOK"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "ONEXPLAYER mini A07"),
 		},
-		.driver_data = (void *)oxp_mini_amd,
+		.driver_data = (void *)oxp_mini_amd_a07,
 	},
 	{
 		.matches = {
@@ -206,6 +207,7 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 			case aya_neo_air_pro:
 			case aya_neo_geek:
 			case oxp_mini_amd:
+			case oxp_mini_amd_a07:
 				*val = (*val * 255) / 100;
 				break;
 			case oxp_mini_amd_pro:
@@ -247,6 +249,7 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 			case aya_neo_air_pro:
 			case aya_neo_geek:
 			case oxp_mini_amd:
+			case oxp_mini_amd_a07:
 				val = (val * 100) / 255;
 				break;
 			case aok_zoe_a1:
