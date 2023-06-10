@@ -246,16 +246,15 @@ static ssize_t oxp_tt_toggle_show(struct device *dev,
 	int retval;
 	u8 reg;
 	long val;
+	int status;
 
 	switch (board) {
 	case oxp_mini_amd_a07:
 		reg = OXP_OLD_TURBO_SWITCH_REG;
-		val = OXP_OLD_TURBO_RETURN_VAL;
 		break;
 	case oxp_mini_amd_pro:
 	case aok_zoe_a1:
 		reg = OXP_TURBO_SWITCH_REG;
-		val = OXP_TURBO_RETURN_VAL;
 		break;
 	default:
 		return -EINVAL;
@@ -265,7 +264,12 @@ static ssize_t oxp_tt_toggle_show(struct device *dev,
 	if (retval)
 		return retval;
 
-	return sysfs_emit(buf, "%ld\n", val);
+	if (val)
+		status = 1;
+	else
+		status = 0;
+
+	return sysfs_emit(buf, "%d\n", status);
 }
 
 static DEVICE_ATTR(tt_toggle, 0644, oxp_tt_toggle_show, oxp_tt_toggle_store);
