@@ -415,6 +415,7 @@ static int oxp_platform_probe(struct platform_device *pdev)
 	const struct dmi_system_id *dmi_entry;
 	struct device *dev = &pdev->dev;
 	struct device *hwdev;
+	int ret;
 
 	/*
 	 * Have to check for AMD processor here because DMI strings are the
@@ -433,13 +434,14 @@ static int oxp_platform_probe(struct platform_device *pdev)
 	case aok_zoe_a1:
 	case oxp_mini_amd_a07:
 	case oxp_mini_amd_pro:
-		hwdev = devm_hwmon_device_register_with_info(dev, "oxpec", NULL,
-							     &oxp_ec_chip_info, oxp_ec_groups);
-		break;
+		ret = devm_device_add_groups(dev, oxp_ec_groups);
+		if (ret)
+			return ret;
 	default:
-		hwdev = devm_hwmon_device_register_with_info(dev, "oxpec", NULL,
-							     &oxp_ec_chip_info, NULL);
 	}
+
+	hwdev = devm_hwmon_device_register_with_info(dev, "oxpec", NULL,
+						     &oxp_ec_chip_info, NULL);
 
 	return PTR_ERR_OR_ZERO(hwdev);
 }
