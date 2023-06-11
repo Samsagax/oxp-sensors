@@ -61,7 +61,7 @@ static enum oxp_board board;
 /* Turbo button takeover function
  * Older boards have different values and EC registers
  * for the same function
-*/
+ */
 #define OXP_OLD_TURBO_SWITCH_REG	0x1E
 #define OXP_OLD_TURBO_TAKE_VAL		0x01
 #define OXP_OLD_TURBO_RETURN_VAL	0x00
@@ -171,7 +171,7 @@ static int write_to_ec(u8 reg, u8 value)
 }
 
 /* Turbo button toggle functions */
-static int oxp_tt_toggle_enable(void)
+static int tt_toggle_enable(void)
 {
 	u8 reg;
 	u8 val;
@@ -192,7 +192,7 @@ static int oxp_tt_toggle_enable(void)
 	return write_to_ec(reg, val);
 }
 
-static int oxp_tt_toggle_disable(void)
+static int tt_toggle_disable(void)
 {
 	u8 reg;
 	u8 val;
@@ -214,39 +214,36 @@ static int oxp_tt_toggle_disable(void)
 }
 
 /* Callbacks for turbo toggle attribute */
-static ssize_t oxp_tt_toggle_store(struct device *dev,
-        struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t tt_toggle_store(struct device *dev,
+			       struct device_attribute *attr, const char *buf,
+			       size_t count)
 {
 	int rval;
-	unsigned int value;
+	bool value;
 
-	rval = kstrtouint(buf, 10, &value);
+	rval = kstrtobool(buf, &value);
 	if (rval)
 		return rval;
 
-	switch (value) {
-	case 0:
-		rval = oxp_tt_toggle_disable();
+	if (value) {
+		rval = tt_toggle_enable();
 		if (rval)
 			return rval;
 		return count;
-	case 1:
-		rval = oxp_tt_toggle_enable();
+	} else {
+		rval = tt_toggle_disable();
 		if (rval)
 			return rval;
 		return count;
-	default:
-		return -EINVAL;
 	}
 }
 
-static ssize_t oxp_tt_toggle_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static ssize_t tt_toggle_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
 {
 	int retval;
 	u8 reg;
 	long val;
-	int status;
 
 	switch (board) {
 	case oxp_mini_amd_a07:
@@ -264,15 +261,10 @@ static ssize_t oxp_tt_toggle_show(struct device *dev,
 	if (retval)
 		return retval;
 
-	if (val)
-		status = 1;
-	else
-		status = 0;
-
-	return sysfs_emit(buf, "%d\n", status);
+	return sysfs_emit(buf, "%d\n", !!val);
 }
 
-static DEVICE_ATTR(tt_toggle, 0644, oxp_tt_toggle_show, oxp_tt_toggle_store);
+static DEVICE_ATTR_RW(tt_toggle);
 
 /* PWM enable/disable functions */
 static int oxp_pwm_enable(void)
@@ -396,8 +388,8 @@ static const struct hwmon_channel_info * const oxp_platform_sensors[] = {
 };
 
 static struct attribute *oxp_ec_attrs[] = {
-    &dev_attr_tt_toggle.attr,
-    NULL
+	&dev_attr_tt_toggle.attr,
+	NULL
 };
 
 ATTRIBUTE_GROUPS(oxp_ec);
@@ -441,7 +433,9 @@ static int oxp_platform_probe(struct platform_device *pdev)
 		ret = devm_device_add_groups(dev, oxp_ec_groups);
 		if (ret)
 			return ret;
+		break;
 	default:
+		break;
 	}
 
 	hwdev = devm_hwmon_device_register_with_info(dev, "oxpec", NULL,
