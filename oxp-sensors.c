@@ -16,7 +16,6 @@
  */
 
 #include <linux/acpi.h>
-#include <linux/dev_printk.h>
 #include <linux/dmi.h>
 #include <linux/hwmon.h>
 #include <linux/init.h>
@@ -227,15 +226,13 @@ static ssize_t tt_toggle_store(struct device *dev,
 
 	if (value) {
 		rval = tt_toggle_enable();
-		if (rval)
-			return rval;
-		return count;
 	} else {
 		rval = tt_toggle_disable();
-		if (rval)
-			return rval;
-		return count;
 	}
+	if (rval)
+		return rval;
+
+	return count;
 }
 
 static ssize_t tt_toggle_show(struct device *dev,
